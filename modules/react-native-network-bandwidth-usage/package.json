@@ -1,0 +1,13 @@
+{
+  "name": "react-native-network-bandwidth-usage",
+  "version": "1.0.0",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "peerDependencies": {
+    "@react-native-community/netinfo": ">=11.0.0",
+    "expo": "*",
+    "expo-modules-core": "*",
+    "react": "*",
+    "react-native": "*"
+  }
+}
