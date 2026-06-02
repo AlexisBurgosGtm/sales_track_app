@@ -45,6 +45,7 @@ import {
   saveDeviceId,
   setDeviceIdLocked,
   syncEmployeeGpsIfDue,
+  syncEmployeeGpsNow,
   SyncResult,
 } from './src/gpsSync';
 import {
@@ -112,9 +113,17 @@ export default function App() {
     setBandwidthUsage(await refreshBandwidthUsage());
   }, []);
 
+  const runSyncAndRefresh = useCallback(async () => {
+    const result = await syncEmployeeGpsNow();
+    setSyncStatus(result);
+    setSecondsUntilSync(await getSecondsUntilNextSync());
+    return result;
+  }, []);
+
   const handleSaveDeviceId = async () => {
     const trimmedDeviceId = deviceId.trim();
     await saveDeviceId(trimmedDeviceId);
+    setDeviceId(trimmedDeviceId);
 
     if (!trimmedDeviceId) {
       setDeviceSaveMessage('Ingrese el ID del dispositivo');
@@ -132,6 +141,7 @@ export default function App() {
           ? 'ID guardado. Empleado habilitado'
           : `ID guardado. ${result.message}`,
       );
+      await runSyncAndRefresh();
     } finally {
       setIsDeviceChecking(false);
     }
@@ -142,6 +152,7 @@ export default function App() {
   const handleSaveCompanyId = async () => {
     const trimmedCompanyId = companyId.trim();
     await saveCompanyId(trimmedCompanyId);
+    setCompanyId(trimmedCompanyId);
 
     if (!trimmedCompanyId) {
       setCompanySaveMessage('Ingrese el ID de la empresa');
@@ -160,6 +171,7 @@ export default function App() {
           ? 'Empresa guardada y habilitada'
           : `Empresa guardada. ${result.message}`,
       );
+      await runSyncAndRefresh();
     } finally {
       setIsCompanyChecking(false);
     }
@@ -293,7 +305,15 @@ export default function App() {
         },
       );
 
-      await runSyncIfDue();
+      if (savedDeviceId && savedCompanyId) {
+        const result = await syncEmployeeGpsNow();
+        if (mounted) {
+          setSyncStatus(result);
+          setSecondsUntilSync(await getSecondsUntilNextSync());
+        }
+      } else {
+        await runSyncIfDue();
+      }
     };
 
     void loadStoredLocation();

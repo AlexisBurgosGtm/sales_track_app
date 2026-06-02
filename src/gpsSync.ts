@@ -95,6 +95,20 @@ const saveLastSyncResult = async (result: SyncResult) => {
   await AsyncStorage.setItem(LAST_SYNC_STORAGE_KEY, result.syncedAt.toString());
 };
 
+const markSyncAttempt = async () => {
+  await AsyncStorage.setItem(LAST_SYNC_ATTEMPT_STORAGE_KEY, Date.now().toString());
+};
+
+const buildConfigError = async (message: string): Promise<SyncResult> => {
+  const result: SyncResult = {
+    ok: false,
+    message,
+    syncedAt: Date.now(),
+  };
+  await AsyncStorage.setItem(LAST_SYNC_STATUS_STORAGE_KEY, JSON.stringify(result));
+  return result;
+};
+
 export const shouldSyncNow = async () => {
   const lastAttempt = await AsyncStorage.getItem(LAST_SYNC_ATTEMPT_STORAGE_KEY);
   if (!lastAttempt) {
@@ -117,63 +131,33 @@ export const getSecondsUntilNextSync = async () => {
 };
 
 export const syncEmployeeGps = async (): Promise<SyncResult> => {
-  await AsyncStorage.setItem(LAST_SYNC_ATTEMPT_STORAGE_KEY, Date.now().toString());
-
   const deviceId = await getDeviceId();
   if (!deviceId) {
-    const result: SyncResult = {
-      ok: false,
-      message: 'Configura el ID del dispositivo',
-      syncedAt: Date.now(),
-    };
-    await saveLastSyncResult(result);
-    return result;
+    return buildConfigError('Configura el ID del dispositivo');
   }
 
   const companyId = await getCompanyId();
   if (!companyId) {
-    const result: SyncResult = {
-      ok: false,
-      message: 'Configura el ID de la empresa',
-      syncedAt: Date.now(),
-    };
-    await saveLastSyncResult(result);
-    return result;
+    return buildConfigError('Configura el ID de la empresa');
   }
 
   if (!(await isCompanyActive())) {
-    const result: SyncResult = {
-      ok: false,
-      message: 'Empresa inactiva. Envio GPS bloqueado',
-      syncedAt: Date.now(),
-    };
-    await saveLastSyncResult(result);
-    return result;
+    return buildConfigError('Empresa inactiva. Envio GPS bloqueado');
   }
 
   if (!(await isDeviceActive())) {
-    const result: SyncResult = {
-      ok: false,
-      message: 'Empleado no habilitado. Envio GPS bloqueado',
-      syncedAt: Date.now(),
-    };
-    await saveLastSyncResult(result);
-    return result;
+    return buildConfigError('Empleado no habilitado. Envio GPS bloqueado');
   }
 
   const storedLocation = await AsyncStorage.getItem(LOCATION_STORAGE_KEY);
   if (!storedLocation) {
-    const result: SyncResult = {
-      ok: false,
-      message: 'Esperando ubicacion GPS',
-      syncedAt: Date.now(),
-    };
-    await saveLastSyncResult(result);
-    return result;
+    return buildConfigError('Esperando ubicacion GPS');
   }
 
   const location = JSON.parse(storedLocation) as StoredLocation;
   const now = new Date();
+
+  await markSyncAttempt();
 
   try {
     const response = await fetch(`${API_BASE_URL}/api/gps`, {
@@ -226,6 +210,8 @@ export const syncEmployeeGpsIfDue = async () => {
 
   return syncEmployeeGps();
 };
+
+export const syncEmployeeGpsNow = async () => syncEmployeeGps();
 
 export const registerBackgroundSync = async () => {
   const BackgroundFetch = await import('expo-background-fetch');
